@@ -1,0 +1,34 @@
+nodes:
+    - address: <host1>
+      user: <username>
+      role:
+        - controlplane
+        - etcd
+        - worker
+      hostname_override: <host1-name-without-dot>
+    
+    - address: <host2>
+      user: <username>
+      role:
+        - worker
+      hostname_override: <host2-name-without-dot>
+
+# If set to true, RKE will not fail when unsupported Docker version are found
+ignore_docker_version: true
+
+# Cluster level SSH private key
+# Used if no ssh information is set for the node
+ssh_key_path: ./keys/rancher_rsa
+
+# Set the name of the Kubernetes cluster
+cluster_name: test-sandbox
+
+services:
+  etcd:
+    snapshot: true
+    creation: 6h
+    retention: 24h
+    extra_args:
+      election-timeout: "5000"
+      heartbeat-interval: "500"
+
