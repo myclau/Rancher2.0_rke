@@ -1,6 +1,13 @@
 # Rancher2.0_rke
 create Rancher K8s cluster in your local machine
 
+# Assumption
+1. you will use an ubuntu server to run those script
+2. your nodes can be vm or physical machine, and will be CentOS or Ubuntu
+3. all machine have create user and the machine from 1 already ssh-copy-id of your ssh key in ~/.ssh
+4. all machines can connect together
+
+
 # Steps
 1. Download all script and run chmod a+x *.sh
 2. run ./preinstall/preinstall_tool_rancher2.0.sh in your local machine
