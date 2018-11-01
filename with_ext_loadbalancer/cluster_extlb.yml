@@ -1,0 +1,139 @@
+nodes:
+    - address: <host1>
+      user: <username>
+      role:
+        - controlplane
+        - etcd
+        - worker
+      hostname_override: <host1-name-without-dot>
+    
+    - address: <host2>
+      user: <username>
+      role:
+        - worker
+      hostname_override: <host2-name-without-dot>
+
+# If set to true, RKE will not fail when unsupported Docker version are found
+ignore_docker_version: true
+
+# Cluster level SSH private key
+# Used if no ssh information is set for the node
+ssh_key_path: ./keys/rancher_rsa
+
+# Set the name of the Kubernetes cluster
+cluster_name: test-sandbox
+
+services:
+  etcd:
+    snapshot: true
+    creation: 6h
+    retention: 24h
+    extra_args:
+      election-timeout: "5000"
+      heartbeat-interval: "500"
+
+addons: |-
+  ---
+  kind: Namespace
+  apiVersion: v1
+  metadata:
+    name: cattle-system
+  ---
+  kind: ServiceAccount
+  apiVersion: v1
+  metadata:
+    name: cattle-admin
+    namespace: cattle-system
+  ---
+  kind: ClusterRoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: cattle-crb
+    namespace: cattle-system
+  subjects:
+  - kind: ServiceAccount
+    name: cattle-admin
+    namespace: cattle-system
+  roleRef:
+    kind: ClusterRole
+    name: cluster-admin
+    apiGroup: rbac.authorization.k8s.io
+  ---
+  apiVersion: v1
+  kind: Service
+  metadata:
+    namespace: cattle-system
+    name: cattle-service
+    labels:
+      app: cattle
+  spec:
+    ports:
+    - port: 80
+      targetPort: 80
+      protocol: TCP
+      name: http
+    selector:
+      app: cattle
+  ---
+  apiVersion: extensions/v1beta1
+  kind: Ingress
+  metadata:
+    namespace: cattle-system
+    name: cattle-ingress-http
+    annotations:
+      nginx.ingress.kubernetes.io/proxy-connect-timeout: "30"
+      nginx.ingress.kubernetes.io/proxy-read-timeout: "1800"   # Max time in seconds for ws to remain shell window open
+      nginx.ingress.kubernetes.io/proxy-send-timeout: "1800"   # Max time in seconds for ws to remain shell window open
+      nginx.ingress.kubernetes.io/ssl-redirect: "false"        # Disable redirect to ssl
+  spec:
+    rules:
+    - host: <lb domain>
+      http:
+        paths:
+        - backend:
+            serviceName: cattle-service
+            servicePort: 80
+  ---
+  kind: Deployment
+  apiVersion: extensions/v1beta1
+  metadata:
+    namespace: cattle-system
+    name: cattle
+  spec:
+    replicas: 1
+    template:
+      metadata:
+        labels:
+          app: cattle
+      spec:
+        serviceAccountName: cattle-admin
+        containers:
+        # Rancher install via RKE addons is only supported up to v2.0.8
+        - image: rancher/rancher:v2.0.8
+          args:
+          - --no-cacerts
+          imagePullPolicy: Always
+          name: cattle-server
+  #       env:
+  #       - name: HTTP_PROXY
+  #         value: "http://your_proxy_address:port"
+  #       - name: HTTPS_PROXY
+  #         value: "http://your_proxy_address:port"
+  #       - name: NO_PROXY
+  #         value: "localhost,127.0.0.1,0.0.0.0,10.43.0.0/16,your_network_ranges_that_dont_need_proxy_to_access"
+          livenessProbe:
+            httpGet:
+              path: /ping
+              port: 80
+            initialDelaySeconds: 60
+            periodSeconds: 60
+          readinessProbe:
+            httpGet:
+              path: /ping
+              port: 80
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          ports:
+          - containerPort: 80
+            protocol: TCP
+
